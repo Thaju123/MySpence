@@ -105,6 +105,7 @@ const els = {
   catRows: document.getElementById('catRows'),
   catEmpty: document.getElementById('catEmpty'),
   insight: document.getElementById('insight'),
+  monthlyMood: document.getElementById('monthlyMood'),
 }
 
 els.date.value = todayISO()
@@ -341,6 +342,90 @@ function renderAnalytics() {
   } else {
     els.insight.hidden = true
   }
+
+  renderMonthlyMood()
+}
+
+function monthKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function sumByCategory(items) {
+  const map = new Map()
+  for (const e of items) map.set(e.category, (map.get(e.category) || 0) + e.amount)
+  return map
+}
+
+function renderMonthlyMood() {
+  const now = new Date()
+  const thisKey = monthKey(now)
+  const lastDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const lastKey = monthKey(lastDate)
+
+  const thisMonth = expenses.filter((e) => e.date.slice(0, 7) === thisKey)
+  const lastMonth = expenses.filter((e) => e.date.slice(0, 7) === lastKey)
+
+  if (thisMonth.length === 0) {
+    els.monthlyMood.hidden = true
+    return
+  }
+
+  const thisMap = sumByCategory(thisMonth)
+  const lastMap = sumByCategory(lastMonth)
+  const categories = new Set([...thisMap.keys(), ...lastMap.keys()])
+
+  let best = null
+  for (const category of categories) {
+    const current = thisMap.get(category) || 0
+    const previous = lastMap.get(category) || 0
+    if (current === 0 && previous === 0) continue
+
+    let score = 0
+    let kind = 'same'
+    let pct = 0
+
+    if (previous > 0 && current > 0) {
+      pct = Math.round(((current - previous) / previous) * 100)
+      score = Math.abs(pct)
+      kind = pct > 0 ? 'more' : pct < 0 ? 'less' : 'same'
+    } else if (previous === 0 && current > 0) {
+      score = 1000 + current
+      kind = 'new'
+    } else if (current === 0 && previous > 0) {
+      score = 500 + previous
+      kind = 'gone'
+    }
+
+    if (!best || score > best.score) {
+      best = { category, current, previous, pct: Math.abs(pct), kind, score }
+    }
+  }
+
+  if (!best) {
+    els.monthlyMood.hidden = true
+    return
+  }
+
+  let line = ''
+  if (best.kind === 'more') {
+    line = `This month you spent <em>${best.pct}% more</em> on <em>${escapeHtml(best.category)}</em> than last month.`
+  } else if (best.kind === 'less') {
+    line = `This month you spent <em>${best.pct}% less</em> on <em>${escapeHtml(best.category)}</em> than last month.`
+  } else if (best.kind === 'same') {
+    line = `This month your <em>${escapeHtml(best.category)}</em> spend is about the same as last month.`
+  } else if (best.kind === 'new') {
+    line = `New this month: you’ve spent <em>${formatMoney(best.current)}</em> on <em>${escapeHtml(best.category)}</em>.`
+  } else if (best.kind === 'gone') {
+    line = `Nice — no <em>${escapeHtml(best.category)}</em> spend this month (was ${formatMoney(best.previous)} last month).`
+  }
+
+  if (lastMonth.length === 0 && thisMonth.length > 0) {
+    const topCat = [...thisMap.entries()].sort((a, b) => b[1] - a[1])[0]
+    line = `This month so far, most of your spend is on <em>${escapeHtml(topCat[0])}</em> (${formatMoney(topCat[1])}). Keep logging to unlock month-over-month mood.`
+  }
+
+  els.monthlyMood.hidden = false
+  els.monthlyMood.innerHTML = `<span class="mood-label">Monthly mood</span>${line}`
 }
 
 function escapeHtml(str) {

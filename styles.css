@@ -520,6 +520,37 @@ select:focus {
   color: var(--accent);
 }
 
+.mood {
+  margin: 0 0 1.15rem;
+  padding: 0.95rem 1rem;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, rgba(226, 166, 106, 0.16), rgba(122, 163, 196, 0.1));
+  border: 1px solid rgba(226, 166, 106, 0.28);
+  color: var(--text);
+  font-family: var(--display);
+  font-size: 1.05rem;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+}
+
+.mood em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.mood .mood-label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-family: var(--font);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 @keyframes rise {
   from {
     opacity: 0;
