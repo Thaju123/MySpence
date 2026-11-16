@@ -87,8 +87,12 @@
             <div class="filter-presets" role="group" aria-label="Date presets">
               <button type="button" class="chip active" data-preset="all">All</button>
               <button type="button" class="chip" data-preset="today">Today</button>
+              <button type="button" class="chip" data-preset="yesterday">Yesterday</button>
               <button type="button" class="chip" data-preset="week">This week</button>
+              <button type="button" class="chip" data-preset="lastWeek">Last week</button>
               <button type="button" class="chip" data-preset="month">This month</button>
+              <button type="button" class="chip" data-preset="lastMonth">Last month</button>
+              <button type="button" class="chip" data-preset="last30">Last 30 days</button>
             </div>
 
             <div class="form-row">
@@ -122,10 +126,12 @@
               </label>
             </div>
 
+            <p class="filter-hint">All past expenses stay saved on this device. Use filters to open any week or month.</p>
             <button type="button" class="btn btn-secondary" id="clearFilters">Clear filters</button>
           </div>
 
           <ul class="expense-list" id="expenseList"></ul>
+          <button type="button" class="btn btn-secondary load-more" id="loadMore" hidden>Load more</button>
           <div class="empty" id="emptyState" hidden>
             <strong>No expenses yet</strong>
             Add your first spend above — it stays in local storage.

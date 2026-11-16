@@ -243,6 +243,17 @@ button {
   background: var(--accent-soft);
 }
 
+.filter-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.load-more {
+  margin-top: 0.75rem;
+}
+
 .form-grid {
   display: grid;
   gap: 0.7rem;

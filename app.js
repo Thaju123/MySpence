@@ -1,4 +1,5 @@
 const KEY = 'myspence-expenses'
+const PAGE_SIZE = 8
 const CATEGORY_COLORS = {
   Food: '#e2a66a',
   Transport: '#7aa3c4',
@@ -36,14 +37,30 @@ function startOfWeek(d) {
   return copy
 }
 
+function endOfWeek(d) {
+  const start = startOfWeek(d)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 6)
+  return end
+}
+
 function startOfMonth(d) {
   return new Date(d.getFullYear(), d.getMonth(), 1)
 }
 
+function endOfMonth(d) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0)
+}
+
+function addDays(d, days) {
+  const copy = new Date(d)
+  copy.setDate(copy.getDate() + days)
+  return copy
+}
+
 function isInCurrentWeek(iso) {
   const start = startOfWeek(new Date())
-  const end = new Date(start)
-  end.setDate(end.getDate() + 6)
+  const end = endOfWeek(new Date())
   return iso >= toISODate(start) && iso <= toISODate(end)
 }
 
@@ -81,6 +98,7 @@ function saveExpenses(expenses) {
 
 let expenses = loadExpenses()
 let activePreset = 'all'
+let visibleCount = PAGE_SIZE
 
 const els = {
   todayTotal: document.getElementById('todayTotal'),
@@ -99,6 +117,7 @@ const els = {
   filterCategory: document.getElementById('filterCategory'),
   filterSearch: document.getElementById('filterSearch'),
   clearFilters: document.getElementById('clearFilters'),
+  loadMore: document.getElementById('loadMore'),
   homeView: document.getElementById('homeView'),
   analyticsView: document.getElementById('analyticsView'),
   barChart: document.getElementById('barChart'),
@@ -125,6 +144,7 @@ document.querySelectorAll('.tab').forEach((tab) => {
 document.querySelectorAll('[data-preset]').forEach((chip) => {
   chip.addEventListener('click', () => {
     applyPreset(chip.dataset.preset)
+    resetVisible()
     render()
   })
 })
@@ -135,6 +155,7 @@ document.querySelectorAll('[data-preset]').forEach((chip) => {
       activePreset = 'custom'
       syncPresetChips()
     }
+    resetVisible()
     render()
   })
 })
@@ -143,6 +164,12 @@ els.clearFilters.addEventListener('click', () => {
   applyPreset('all')
   els.filterCategory.value = 'all'
   els.filterSearch.value = ''
+  resetVisible()
+  render()
+})
+
+els.loadMore.addEventListener('click', () => {
+  visibleCount += PAGE_SIZE
   render()
 })
 
@@ -167,6 +194,7 @@ els.expenseForm.addEventListener('submit', (e) => {
   els.note.value = ''
   els.date.value = todayISO()
   els.category.value = 'Food'
+  resetVisible()
   render()
   els.amount.focus()
 })
@@ -179,9 +207,14 @@ els.expenseList.addEventListener('click', (e) => {
   render()
 })
 
+function resetVisible() {
+  visibleCount = PAGE_SIZE
+}
+
 function applyPreset(preset) {
   activePreset = preset
   const now = new Date()
+
   if (preset === 'all') {
     els.filterFrom.value = ''
     els.filterTo.value = ''
@@ -189,16 +222,29 @@ function applyPreset(preset) {
     const t = todayISO()
     els.filterFrom.value = t
     els.filterTo.value = t
+  } else if (preset === 'yesterday') {
+    const y = toISODate(addDays(now, -1))
+    els.filterFrom.value = y
+    els.filterTo.value = y
   } else if (preset === 'week') {
-    const start = startOfWeek(now)
-    const end = new Date(start)
-    end.setDate(end.getDate() + 6)
-    els.filterFrom.value = toISODate(start)
-    els.filterTo.value = toISODate(end)
+    els.filterFrom.value = toISODate(startOfWeek(now))
+    els.filterTo.value = toISODate(endOfWeek(now))
+  } else if (preset === 'lastWeek') {
+    const lastWeekDay = addDays(startOfWeek(now), -1)
+    els.filterFrom.value = toISODate(startOfWeek(lastWeekDay))
+    els.filterTo.value = toISODate(endOfWeek(lastWeekDay))
   } else if (preset === 'month') {
     els.filterFrom.value = toISODate(startOfMonth(now))
     els.filterTo.value = todayISO()
+  } else if (preset === 'lastMonth') {
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    els.filterFrom.value = toISODate(startOfMonth(prev))
+    els.filterTo.value = toISODate(endOfMonth(prev))
+  } else if (preset === 'last30') {
+    els.filterFrom.value = toISODate(addDays(now, -29))
+    els.filterTo.value = todayISO()
   }
+
   syncPresetChips()
 }
 
@@ -246,13 +292,15 @@ function render() {
     return b.createdAt.localeCompare(a.createdAt)
   })
   const filteredSum = filtered.reduce((s, e) => s + e.amount, 0)
+  const visible = filtered.slice(0, visibleCount)
+  const remaining = filtered.length - visible.length
 
   if (expenses.length === 0) {
     els.filterTotal.textContent = ''
   } else if (filtersActive()) {
-    els.filterTotal.textContent = `${filtered.length} shown · ${formatMoney(filteredSum)}`
+    els.filterTotal.textContent = `${visible.length}/${filtered.length} shown · ${formatMoney(filteredSum)}`
   } else {
-    els.filterTotal.textContent = `${expenses.length} total · ${formatMoney(filteredSum)}`
+    els.filterTotal.textContent = `${visible.length}/${expenses.length} shown · ${formatMoney(filteredSum)}`
   }
 
   const noData = expenses.length === 0
@@ -261,7 +309,7 @@ function render() {
   els.filterEmpty.hidden = !noMatch
   els.expenseList.hidden = noData || noMatch
 
-  els.expenseList.innerHTML = filtered
+  els.expenseList.innerHTML = visible
     .map(
       (item) => `
       <li class="expense-item">
@@ -279,6 +327,13 @@ function render() {
       </li>`,
     )
     .join('')
+
+  if (remaining > 0 && !noData && !noMatch) {
+    els.loadMore.hidden = false
+    els.loadMore.textContent = `Load more (${remaining} left)`
+  } else {
+    els.loadMore.hidden = true
+  }
 
   if (!els.analyticsView.hidden) renderAnalytics()
 }
