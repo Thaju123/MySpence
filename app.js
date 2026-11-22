@@ -118,6 +118,7 @@ const els = {
   filterSearch: document.getElementById('filterSearch'),
   clearFilters: document.getElementById('clearFilters'),
   loadMore: document.getElementById('loadMore'),
+  exportExcel: document.getElementById('exportExcel'),
   homeView: document.getElementById('homeView'),
   analyticsView: document.getElementById('analyticsView'),
   barChart: document.getElementById('barChart'),
@@ -172,6 +173,44 @@ els.loadMore.addEventListener('click', () => {
   visibleCount += PAGE_SIZE
   render()
 })
+
+els.exportExcel.addEventListener('click', exportExpensesToExcel)
+
+function csvEscape(value) {
+  const str = String(value ?? '')
+  if (/[",\n\r]/.test(str)) return `"${str.replaceAll('"', '""')}"`
+  return str
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((row) => row.map(csvEscape).join(',')).join('\r\n')
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function exportExpensesToExcel() {
+  if (expenses.length === 0) {
+    alert('No expenses to export yet.')
+    return
+  }
+
+  const sorted = [...expenses].sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date)
+    return a.createdAt.localeCompare(b.createdAt)
+  })
+
+  const rows = [
+    ['Date', 'Category', 'Amount (₹)', 'Note', 'Created At'],
+    ...sorted.map((e) => [e.date, e.category, e.amount, e.note || '', e.createdAt]),
+  ]
+
+  downloadCsv(`myspence-expenses-${todayISO()}.csv`, rows)
+}
 
 els.expenseForm.addEventListener('submit', (e) => {
   e.preventDefault()

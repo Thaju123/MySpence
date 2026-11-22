@@ -47,6 +47,7 @@
     taskInput: document.getElementById('taskInput'),
     calendar: document.getElementById('calendar'),
     exportBtn: document.getElementById('exportBtn'),
+    exportExcelBtn: document.getElementById('exportExcelBtn'),
     importBtn: document.getElementById('importBtn'),
     importFile: document.getElementById('importFile'),
   }
@@ -147,6 +148,7 @@
   })
 
   els.exportBtn.addEventListener('click', exportData)
+  els.exportExcelBtn.addEventListener('click', exportToExcel)
   els.importBtn.addEventListener('click', () => els.importFile.click())
   els.importFile.addEventListener('change', importData)
 
@@ -388,6 +390,76 @@
     a.download = `mytask-backup-${toISO(todayLocal())}.json`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  function csvEscape(value) {
+    const str = String(value ?? '')
+    if (/[",\n\r]/.test(str)) return `"${str.replaceAll('"', '""')}"`
+    return str
+  }
+
+  function downloadCsv(filename, rows) {
+    const csv = rows.map((row) => row.map(csvEscape).join(',')).join('\r\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function exportToExcel() {
+    const today = todayLocal()
+    if (today < START && masterTasks().length === 0) {
+      alert('No checklist data to export yet.')
+      return
+    }
+
+    const taskById = new Map(tasks.map((t) => [t.id, t]))
+    const rows = [['Date', 'Day', 'Task', 'Done', 'Status']]
+
+    const end = today < START ? START : today
+    for (let d = new Date(START); d <= end; d = addDays(d, 1)) {
+      if (d > today) break
+      const iso = toISO(d)
+      const dayNum = dayNumber(d)
+      const list = checklistForDay(iso)
+      const dayHistory = history[iso] || {}
+
+      if (list.length === 0) {
+        // Still include days with only deleted-task history
+        const ids = Object.keys(dayHistory)
+        if (ids.length === 0) continue
+        for (const id of ids) {
+          const task = taskById.get(id)
+          const done = Boolean(dayHistory[id])
+          rows.push([iso, dayNum, task?.title || id, done ? 'Yes' : 'No', done ? 'Done' : 'Missed'])
+        }
+        continue
+      }
+
+      for (const task of list) {
+        const done = Boolean(dayHistory[task.id])
+        rows.push([iso, dayNum, task.title, done ? 'Yes' : 'No', done ? 'Done' : 'Missed'])
+      }
+    }
+
+    if (rows.length === 1) {
+      // Before Day 1: export the checklist setup only
+      rows[0] = ['Task', 'Created On']
+      for (const task of masterTasks()) {
+        rows.push([task.title, task.createdOn])
+      }
+      if (rows.length === 1) {
+        alert('No checklist data to export yet.')
+        return
+      }
+      downloadCsv(`mytask-habits-${toISO(todayLocal())}.csv`, rows)
+      return
+    }
+
+    downloadCsv(`mytask-log-${toISO(todayLocal())}.csv`, rows)
   }
 
   function importData(e) {
