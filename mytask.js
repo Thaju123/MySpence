@@ -23,17 +23,12 @@
     dayLabel: document.getElementById('dayLabel'),
     dayTitle: document.getElementById('dayTitle'),
     daySub: document.getElementById('daySub'),
-    preStart: document.getElementById('preStart'),
     mainApp: document.getElementById('mainApp'),
     progressStat: document.getElementById('progressStat'),
     streakStat: document.getElementById('streakStat'),
     bestStat: document.getElementById('bestStat'),
     listHeading: document.getElementById('listHeading'),
     listHint: document.getElementById('listHint'),
-    statsRow: document.getElementById('statsRow'),
-    navDay: document.getElementById('navDay'),
-    progressWrap: document.getElementById('progressWrap'),
-    overviewPanel: document.getElementById('overviewPanel'),
     prevDay: document.getElementById('prevDay'),
     todayBtn: document.getElementById('todayBtn'),
     nextDay: document.getElementById('nextDay'),
@@ -48,12 +43,18 @@
     calendar: document.getElementById('calendar'),
     exportBtn: document.getElementById('exportBtn'),
     exportExcelBtn: document.getElementById('exportExcelBtn'),
+    viewReportBtn: document.getElementById('viewReportBtn'),
+    reportView: document.getElementById('reportView'),
+    reportPeriod: document.getElementById('reportPeriod'),
+    reportCustom: document.getElementById('reportCustom'),
+    reportFrom: document.getElementById('reportFrom'),
+    reportTo: document.getElementById('reportTo'),
     importBtn: document.getElementById('importBtn'),
     importFile: document.getElementById('importFile'),
   }
 
   applyTheme(settings.theme)
-  ensureDayHistory(toISO(clampDate(todayLocal())))
+  if (todayLocal() >= START) ensureDayHistory(toISO(clampDate(todayLocal())))
   render()
 
   els.themeToggle.addEventListener('click', () => {
@@ -90,7 +91,6 @@
     if (!title) return
 
     const today = todayLocal()
-    // Before Day 1, habits are ready from Day 1; after that, from today.
     const createdOn = toISO(today < START ? START : today)
     /** @type {Task} */
     const task = {
@@ -102,7 +102,6 @@
     tasks = [task, ...tasks]
     saveJSON(KEYS.tasks, tasks)
 
-    // Shared daily list — seed ticks only once tracking has started.
     if (today >= START) {
       if (!history[createdOn]) history[createdOn] = {}
       history[createdOn][task.id] = false
@@ -114,6 +113,17 @@
     render()
     els.taskInput.focus()
   })
+
+  els.reportPeriod.addEventListener('change', () => {
+    els.reportCustom.hidden = els.reportPeriod.value !== 'custom'
+    if (!els.reportView.hidden && els.reportPeriod.value !== 'custom') showTaskReport(false)
+  })
+  ;[els.reportFrom, els.reportTo].forEach((input) => {
+    input.addEventListener('change', () => {
+      if (els.reportPeriod.value === 'custom' && !els.reportView.hidden) showTaskReport(false)
+    })
+  })
+  els.viewReportBtn.addEventListener('click', () => showTaskReport(false))
 
   // Main list: tap a row to mark done / not done
   els.taskList.addEventListener('click', (e) => {
@@ -148,7 +158,7 @@
   })
 
   els.exportBtn.addEventListener('click', exportData)
-  els.exportExcelBtn.addEventListener('click', exportToExcel)
+  els.exportExcelBtn.addEventListener('click', () => showTaskReport(true))
   els.importBtn.addEventListener('click', () => els.importFile.click())
   els.importFile.addEventListener('change', importData)
 
@@ -192,6 +202,10 @@
 
   function toggleTask(id) {
     if (!id) return
+    if (todayLocal() < START) {
+      alert('Ticking starts on Day 1 — 23 Nov 2026.')
+      return
+    }
     const iso = toISO(viewDate)
     if (!history[iso]) history[iso] = {}
     history[iso][id] = !history[iso][id]
@@ -261,13 +275,9 @@
 
   function render() {
     const today = todayLocal()
-    const beforeStart = today < START
     const master = masterTasks()
+    const trackingLive = today >= START
 
-    els.mainApp.hidden = false
-    els.preStart.hidden = !beforeStart
-
-    // Always render manage list so habits can be added anytime
     els.manageList.innerHTML = master
       .map(
         (task) => `
@@ -281,19 +291,23 @@
       )
       .join('')
 
-    if (beforeStart) {
-      els.dayLabel.textContent = 'Coming soon'
-      els.dayTitle.textContent = 'Tracking starts on 23 Nov 2026'
-      els.daySub.textContent = `Today is ${formatFull(today)}. Build your checklist now — Day 1 begins Mon, 23 Nov 2026.`
-      els.listHeading.textContent = 'Set up your checklist'
+    if (!trackingLive) {
+      els.dayLabel.textContent = 'Ready'
+      els.dayTitle.textContent = 'Day 1 starts tomorrow'
+      els.daySub.textContent = `23 Nov 2026 · Add your habits now. Normal daily ticking begins tomorrow.`
+      els.listHeading.textContent = 'Daily checklist'
       els.listHint.textContent =
-        'Add the habits you want to do every day. Ticking starts on Day 1.'
-      els.statsRow.hidden = true
-      els.navDay.hidden = true
-      els.progressWrap.hidden = true
-      els.overviewPanel.hidden = true
+        'Same checklist every day. Set it up now — mark done/not done from Day 1 (23 Nov).'
+      els.progressStat.textContent = '—'
+      els.streakStat.textContent = '0'
+      els.bestStat.textContent = '0'
+      els.progressText.textContent = 'Starts tomorrow'
+      els.progressPct.textContent = '—'
+      els.progressFill.style.width = '0%'
+      els.prevDay.disabled = true
+      els.nextDay.disabled = true
       els.emptyTasks.hidden = master.length > 0
-      els.emptyTasks.textContent = 'No habits yet. Type one below and tap Add to list.'
+      els.emptyTasks.textContent = 'No tasks yet. Add habits below — they’ll show every day.'
       els.taskList.innerHTML = master
         .map(
           (task) => `
@@ -303,15 +317,9 @@
           </li>`,
         )
         .join('')
+      els.calendar.innerHTML = '<p class="list-hint">Calendar unlocks on Day 1 (23 Nov 2026).</p>'
       return
     }
-
-    els.statsRow.hidden = false
-    els.navDay.hidden = false
-    els.progressWrap.hidden = false
-    els.overviewPanel.hidden = false
-    els.listHint.textContent =
-      'Same checklist every day. Tap to mark done or not done. Use Add / edit checklist to change habits.'
 
     viewDate = clampDate(viewDate)
     const iso = toISO(viewDate)
@@ -322,6 +330,8 @@
     els.dayTitle.textContent = `Day ${dayNum}`
     els.daySub.textContent = formatFull(viewDate)
     els.listHeading.textContent = isToday ? 'Daily checklist' : `Checklist · ${formatShort(viewDate)}`
+    els.listHint.textContent =
+      'Same checklist every day. Tap to mark done or not done. Use Add / edit checklist to change habits.'
 
     els.prevDay.disabled = viewDate <= START
     els.nextDay.disabled = viewDate >= today
@@ -341,7 +351,6 @@
 
     els.emptyTasks.hidden = list.length > 0
     els.emptyTasks.textContent = 'No tasks yet. Add habits below — they’ll show every day.'
-    // Main view: same habits, only mark done / not done
     els.taskList.innerHTML = list
       .map((task) => {
         const checked = Boolean(dayHistory[task.id])
@@ -357,11 +366,15 @@
   }
 
   function renderCalendar(today, selectedIso) {
+    if (today < START) {
+      els.calendar.innerHTML = '<p class="list-hint">Calendar unlocks on Day 1 (23 Nov 2026).</p>'
+      return
+    }
+
     const heads = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
     let html = heads.map((h) => `<div class="cal-head">${h}</div>`).join('')
 
-    // Pad to Monday-start grid from START
-    const startDow = (START.getDay() + 6) % 7 // Mon=0
+    const startDow = (START.getDay() + 6) % 7
     for (let i = 0; i < startDow; i++) html += `<div class="cal-cell empty"></div>`
 
     for (let d = new Date(START); d <= today; d = addDays(d, 1)) {
@@ -409,57 +422,200 @@
     URL.revokeObjectURL(url)
   }
 
-  function exportToExcel() {
-    const today = todayLocal()
-    if (today < START && masterTasks().length === 0) {
-      alert('No checklist data to export yet.')
-      return
+  function startOfWeekLocal(d) {
+    const copy = new Date(d)
+    const day = copy.getDay()
+    const diff = day === 0 ? 6 : day - 1
+    copy.setDate(copy.getDate() - diff)
+    copy.setHours(0, 0, 0, 0)
+    return copy
+  }
+
+  function endOfWeekLocal(d) {
+    const start = startOfWeekLocal(d)
+    return addDays(start, 6)
+  }
+
+  function startOfMonthLocal(d) {
+    return new Date(d.getFullYear(), d.getMonth(), 1)
+  }
+
+  function endOfMonthLocal(d) {
+    return new Date(d.getFullYear(), d.getMonth() + 1, 0)
+  }
+
+  function getReportRange(period) {
+    const now = todayLocal()
+    if (period === 'week') {
+      return { from: toISO(startOfWeekLocal(now)), to: toISO(endOfWeekLocal(now)), label: 'this-week' }
     }
+    if (period === 'lastWeek') {
+      const day = addDays(startOfWeekLocal(now), -1)
+      return { from: toISO(startOfWeekLocal(day)), to: toISO(endOfWeekLocal(day)), label: 'last-week' }
+    }
+    if (period === 'month') {
+      return { from: toISO(startOfMonthLocal(now)), to: toISO(now), label: 'this-month' }
+    }
+    if (period === 'lastMonth') {
+      const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      return {
+        from: toISO(startOfMonthLocal(prev)),
+        to: toISO(endOfMonthLocal(prev)),
+        label: 'last-month',
+      }
+    }
+    if (period === 'year') {
+      return {
+        from: `${now.getFullYear()}-01-01`,
+        to: toISO(now),
+        label: `year-${now.getFullYear()}`,
+      }
+    }
+    const from = els.reportFrom.value
+    const to = els.reportTo.value
+    if (!from || !to || from > to) return null
+    return { from, to, label: `custom-${from}-to-${to}` }
+  }
 
-    const taskById = new Map(tasks.map((t) => [t.id, t]))
-    const rows = [['Date', 'Day', 'Task', 'Done', 'Status']]
+  function buildTaskReportRows(from, to) {
+    const rows = []
+    let doneCount = 0
+    let totalCount = 0
+    let perfectDays = 0
+    let trackedDays = 0
 
-    const end = today < START ? START : today
-    for (let d = new Date(START); d <= end; d = addDays(d, 1)) {
-      if (d > today) break
+    for (let d = parseISO(from); d <= parseISO(to); d = addDays(d, 1)) {
       const iso = toISO(d)
       const dayNum = dayNumber(d)
       const list = checklistForDay(iso)
       const dayHistory = history[iso] || {}
-
-      if (list.length === 0) {
-        // Still include days with only deleted-task history
-        const ids = Object.keys(dayHistory)
-        if (ids.length === 0) continue
-        for (const id of ids) {
-          const task = taskById.get(id)
-          const done = Boolean(dayHistory[id])
-          rows.push([iso, dayNum, task?.title || id, done ? 'Yes' : 'No', done ? 'Done' : 'Missed'])
-        }
-        continue
-      }
-
+      if (list.length === 0) continue
+      trackedDays += 1
+      let dayDone = 0
       for (const task of list) {
         const done = Boolean(dayHistory[task.id])
-        rows.push([iso, dayNum, task.title, done ? 'Yes' : 'No', done ? 'Done' : 'Missed'])
+        totalCount += 1
+        if (done) {
+          doneCount += 1
+          dayDone += 1
+        }
+        rows.push({
+          date: iso,
+          day: dayNum,
+          task: task.title,
+          done,
+          status: done ? 'Done' : 'Missed',
+        })
       }
+      if (dayDone === list.length) perfectDays += 1
     }
 
-    if (rows.length === 1) {
-      // Before Day 1: export the checklist setup only
-      rows[0] = ['Task', 'Created On']
-      for (const task of masterTasks()) {
-        rows.push([task.title, task.createdOn])
-      }
-      if (rows.length === 1) {
-        alert('No checklist data to export yet.')
-        return
-      }
-      downloadCsv(`mytask-habits-${toISO(todayLocal())}.csv`, rows)
+    return { rows, doneCount, totalCount, perfectDays, trackedDays }
+  }
+
+  function showTaskReport(download) {
+    const range = getReportRange(els.reportPeriod.value)
+    if (!range) {
+      alert('Pick a valid From and To date for the custom report.')
       return
     }
 
-    downloadCsv(`mytask-log-${toISO(todayLocal())}.csv`, rows)
+    let from = range.from < toISO(START) ? toISO(START) : range.from
+    const todayIso = toISO(todayLocal())
+    let to = range.to > todayIso ? todayIso : range.to
+
+    els.reportView.hidden = false
+
+    if (todayLocal() < START || from > to) {
+      const habits = masterTasks()
+      els.reportView.innerHTML =
+        habits.length === 0
+          ? `<div class="report-empty">No data yet. Tracking starts 23 Nov 2026.</div>`
+          : `
+            <p class="list-hint">Tracking starts 23 Nov 2026. Your checklist so far:</p>
+            <div class="report-table-wrap">
+              <table class="report-table">
+                <thead><tr><th>Task</th><th>Created on</th></tr></thead>
+                <tbody>
+                  ${habits
+                    .map((t) => `<tr><td>${escapeHtml(t.title)}</td><td>${t.createdOn}</td></tr>`)
+                    .join('')}
+                </tbody>
+              </table>
+            </div>`
+
+      if (download) {
+        if (habits.length === 0) {
+          alert('No data in that period yet. Tracking starts 23 Nov 2026.')
+          return
+        }
+        downloadCsv(`mytask-report-${range.label}.csv`, [
+          ['Report', range.label],
+          ['Note', 'Tracking starts 23 Nov 2026 — checklist only for now'],
+          [],
+          ['Task', 'Created On'],
+          ...habits.map((t) => [t.title, t.createdOn]),
+        ])
+      }
+      return
+    }
+
+    const built = buildTaskReportRows(from, to)
+    if (built.rows.length === 0) {
+      els.reportView.innerHTML = `<div class="report-empty">No checklist activity from <strong>${from}</strong> to <strong>${to}</strong>.</div>`
+      if (download) alert('No checklist activity in that period yet.')
+      return
+    }
+
+    const pct = built.totalCount ? Math.round((built.doneCount / built.totalCount) * 100) : 0
+    els.reportView.innerHTML = `
+      <div class="report-summary">
+        <div class="stat-card">
+          <p class="stat-label">Completion</p>
+          <p class="stat-value">${pct}%</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-label">Done</p>
+          <p class="stat-value">${built.doneCount}/${built.totalCount}</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-label">Perfect days</p>
+          <p class="stat-value">${built.perfectDays}/${built.trackedDays}</p>
+        </div>
+      </div>
+      <p class="list-hint" style="margin-bottom:0.65rem">${from} → ${to}</p>
+      <div class="report-table-wrap">
+        <table class="report-table">
+          <thead>
+            <tr><th>Date</th><th>Day</th><th>Task</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            ${built.rows
+              .map(
+                (r) => `
+              <tr>
+                <td>${r.date}</td>
+                <td>${r.day}</td>
+                <td>${escapeHtml(r.task)}</td>
+                <td>${r.status}</td>
+              </tr>`,
+              )
+              .join('')}
+          </tbody>
+        </table>
+      </div>`
+
+    if (download) {
+      downloadCsv(`mytask-report-${range.label}.csv`, [
+        ['Report', range.label],
+        ['From', from],
+        ['To', to],
+        ['Completion %', pct],
+        [],
+        ['Date', 'Day', 'Task', 'Done', 'Status'],
+        ...built.rows.map((r) => [r.date, r.day, r.task, r.done ? 'Yes' : 'No', r.status]),
+      ])
+    }
   }
 
   function importData(e) {

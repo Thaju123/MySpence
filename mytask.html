@@ -32,11 +32,6 @@
         <p class="day-sub" id="daySub"></p>
       </section>
 
-      <div id="preStart" class="panel waiting" hidden>
-        <strong>Tracking starts on 23 Nov 2026</strong>
-        That’s Day 1. Set up your daily checklist below now — ticking begins on Day 1.
-      </div>
-
       <div id="mainApp">
         <div class="stats" id="statsRow">
           <div class="stat-card">
@@ -57,7 +52,7 @@
           <div class="panel-head">
             <h2 id="listHeading">Daily checklist</h2>
           </div>
-          <p class="list-hint" id="listHint">Same checklist every day. Tap to mark done or not done. Edit the list only when you want to change your habits.</p>
+          <p class="list-hint" id="listHint">Same checklist every day. Tap to mark done or not done. Day 1 starts 23 Nov 2026.</p>
 
           <div class="nav-day" id="navDay">
             <button type="button" id="prevDay">← Prev</button>
@@ -107,9 +102,34 @@
         </section>
 
         <section class="panel">
-          <h2>Backup &amp; export</h2>
-          <p class="list-hint">Excel download is a spreadsheet of every day and habit. JSON is for full backup/restore.</p>
-          <button type="button" class="btn btn-secondary" id="exportExcelBtn" style="margin-top:0">Export to Excel</button>
+          <h2>Reports &amp; backup</h2>
+          <p class="list-hint">View or download weekly, monthly, yearly, or custom reports. JSON is for full backup/restore.</p>
+          <label>
+            Period
+            <select id="reportPeriod">
+              <option value="week">This week</option>
+              <option value="lastWeek">Last week</option>
+              <option value="month">This month</option>
+              <option value="lastMonth">Last month</option>
+              <option value="year">This year</option>
+              <option value="custom">Custom range</option>
+            </select>
+          </label>
+          <div class="form-row" id="reportCustom" hidden style="margin-top:0.7rem">
+            <label>
+              From
+              <input type="date" id="reportFrom" />
+            </label>
+            <label>
+              To
+              <input type="date" id="reportTo" />
+            </label>
+          </div>
+          <div class="actions-row" style="margin-top:0.75rem">
+            <button type="button" class="btn btn-secondary" id="viewReportBtn" style="margin-top:0">View report</button>
+            <button type="button" class="btn btn-secondary" id="exportExcelBtn" style="margin-top:0">Download</button>
+          </div>
+          <div class="report-view" id="reportView" hidden></div>
           <div class="actions-row" style="margin-top:0.55rem">
             <button type="button" class="btn btn-secondary" id="exportBtn" style="margin-top:0">Export JSON</button>
             <button type="button" class="btn btn-secondary" id="importBtn" style="margin-top:0">Import JSON</button>

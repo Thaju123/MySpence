@@ -119,6 +119,12 @@ const els = {
   clearFilters: document.getElementById('clearFilters'),
   loadMore: document.getElementById('loadMore'),
   exportExcel: document.getElementById('exportExcel'),
+  viewReport: document.getElementById('viewReport'),
+  reportView: document.getElementById('reportView'),
+  reportPeriod: document.getElementById('reportPeriod'),
+  reportCustom: document.getElementById('reportCustom'),
+  reportFrom: document.getElementById('reportFrom'),
+  reportTo: document.getElementById('reportTo'),
   homeView: document.getElementById('homeView'),
   analyticsView: document.getElementById('analyticsView'),
   barChart: document.getElementById('barChart'),
@@ -174,7 +180,20 @@ els.loadMore.addEventListener('click', () => {
   render()
 })
 
-els.exportExcel.addEventListener('click', exportExpensesToExcel)
+els.reportPeriod.addEventListener('change', () => {
+  els.reportCustom.hidden = els.reportPeriod.value !== 'custom'
+})
+
+els.viewReport.addEventListener('click', () => showExpensesReport(false))
+els.exportExcel.addEventListener('click', () => showExpensesReport(true))
+;[els.reportFrom, els.reportTo].forEach((input) => {
+  input.addEventListener('change', () => {
+    if (els.reportPeriod.value === 'custom' && !els.reportView.hidden) showExpensesReport(false)
+  })
+})
+els.reportPeriod.addEventListener('change', () => {
+  if (!els.reportView.hidden && els.reportPeriod.value !== 'custom') showExpensesReport(false)
+})
 
 function csvEscape(value) {
   const str = String(value ?? '')
@@ -193,23 +212,136 @@ function downloadCsv(filename, rows) {
   URL.revokeObjectURL(url)
 }
 
-function exportExpensesToExcel() {
+function addDaysDate(d, days) {
+  const copy = new Date(d)
+  copy.setDate(copy.getDate() + days)
+  return copy
+}
+
+function endOfMonth(d) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0)
+}
+
+function getReportRange(period) {
+  const now = new Date()
+  if (period === 'week') {
+    return { from: toISODate(startOfWeek(now)), to: toISODate(endOfWeek(now)), label: 'this-week' }
+  }
+  if (period === 'lastWeek') {
+    const day = addDaysDate(startOfWeek(now), -1)
+    return { from: toISODate(startOfWeek(day)), to: toISODate(endOfWeek(day)), label: 'last-week' }
+  }
+  if (period === 'month') {
+    return { from: toISODate(startOfMonth(now)), to: todayISO(), label: 'this-month' }
+  }
+  if (period === 'lastMonth') {
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    return { from: toISODate(startOfMonth(prev)), to: toISODate(endOfMonth(prev)), label: 'last-month' }
+  }
+  if (period === 'year') {
+    return {
+      from: `${now.getFullYear()}-01-01`,
+      to: todayISO(),
+      label: `year-${now.getFullYear()}`,
+    }
+  }
+  // custom
+  const from = els.reportFrom.value
+  const to = els.reportTo.value
+  if (!from || !to) return null
+  if (from > to) return null
+  return { from, to, label: `custom-${from}-to-${to}` }
+}
+
+function getExpensesForReport() {
+  const range = getReportRange(els.reportPeriod.value)
+  if (!range) return { error: 'Pick a valid From and To date for the custom report.' }
+
+  const sorted = expenses
+    .filter((e) => e.date >= range.from && e.date <= range.to)
+    .sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date)
+      return a.createdAt.localeCompare(b.createdAt)
+    })
+
+  return { range, sorted }
+}
+
+function showExpensesReport(download) {
   if (expenses.length === 0) {
-    alert('No expenses to export yet.')
+    alert('No expenses to report yet.')
     return
   }
 
-  const sorted = [...expenses].sort((a, b) => {
-    if (a.date !== b.date) return a.date.localeCompare(b.date)
-    return a.createdAt.localeCompare(b.createdAt)
-  })
+  const result = getExpensesForReport()
+  if (result.error) {
+    alert(result.error)
+    return
+  }
 
-  const rows = [
-    ['Date', 'Category', 'Amount (₹)', 'Note', 'Created At'],
-    ...sorted.map((e) => [e.date, e.category, e.amount, e.note || '', e.createdAt]),
-  ]
+  const { range, sorted } = result
+  const total = sorted.reduce((s, e) => s + e.amount, 0)
+  const byCat = new Map()
+  for (const e of sorted) byCat.set(e.category, (byCat.get(e.category) || 0) + e.amount)
+  const topCat = [...byCat.entries()].sort((a, b) => b[1] - a[1])[0]
 
-  downloadCsv(`myspence-expenses-${todayISO()}.csv`, rows)
+  els.reportView.hidden = false
+  if (sorted.length === 0) {
+    els.reportView.innerHTML = `
+      <div class="report-empty">No expenses from <strong>${range.from}</strong> to <strong>${range.to}</strong>.</div>`
+    if (download) alert('No expenses in that period.')
+    return
+  }
+
+  els.reportView.innerHTML = `
+    <div class="report-summary">
+      <div class="stat-card">
+        <p class="stat-label">Total</p>
+        <p class="stat-value">${formatMoney(total)}</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Entries</p>
+        <p class="stat-value">${sorted.length}</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Top category</p>
+        <p class="stat-value">${topCat ? topCat[0] : '—'}</p>
+      </div>
+    </div>
+    <p class="filter-hint" style="margin-bottom:0.65rem">${range.from} → ${range.to}</p>
+    <div class="report-table-wrap">
+      <table class="report-table">
+        <thead>
+          <tr><th>Date</th><th>Category</th><th>Amount</th><th>Note</th></tr>
+        </thead>
+        <tbody>
+          ${sorted
+            .map(
+              (e) => `
+            <tr>
+              <td>${e.date}</td>
+              <td>${escapeHtml(e.category)}</td>
+              <td>${formatMoney(e.amount)}</td>
+              <td>${escapeHtml(e.note || '—')}</td>
+            </tr>`,
+            )
+            .join('')}
+        </tbody>
+      </table>
+    </div>`
+
+  if (download) {
+    const rows = [
+      ['Report', range.label],
+      ['From', range.from],
+      ['To', range.to],
+      ['Total (₹)', total],
+      [],
+      ['Date', 'Category', 'Amount (₹)', 'Note', 'Created At'],
+      ...sorted.map((e) => [e.date, e.category, e.amount, e.note || '', e.createdAt]),
+    ]
+    downloadCsv(`myspence-report-${range.label}.csv`, rows)
+  }
 }
 
 els.expenseForm.addEventListener('submit', (e) => {

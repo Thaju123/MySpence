@@ -167,9 +167,34 @@
       </section>
 
       <section class="panel">
-        <h2>Export</h2>
-        <p class="filter-hint">Download your expenses as an Excel-friendly spreadsheet (.csv).</p>
-        <button type="button" class="btn btn-secondary" id="exportExcel" style="margin-top:0.5rem">Export to Excel</button>
+        <h2>Reports</h2>
+        <p class="filter-hint">View a period on screen, or download it as an Excel spreadsheet.</p>
+        <label>
+          Period
+          <select id="reportPeriod">
+            <option value="week">This week</option>
+            <option value="lastWeek">Last week</option>
+            <option value="month">This month</option>
+            <option value="lastMonth">Last month</option>
+            <option value="year">This year</option>
+            <option value="custom">Custom range</option>
+          </select>
+        </label>
+        <div class="form-row" id="reportCustom" hidden style="margin-top:0.7rem">
+          <label>
+            From
+            <input type="date" id="reportFrom" />
+          </label>
+          <label>
+            To
+            <input type="date" id="reportTo" />
+          </label>
+        </div>
+        <div class="actions-row" style="margin-top:0.75rem">
+          <button type="button" class="btn btn-secondary" id="viewReport" style="margin-top:0">View report</button>
+          <button type="button" class="btn btn-secondary" id="exportExcel" style="margin-top:0">Download</button>
+        </div>
+        <div class="report-view" id="reportView" hidden></div>
       </section>
     </div>
     <script src="app.js"></script>
