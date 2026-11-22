@@ -68,6 +68,40 @@ button {
   padding: calc(1rem + var(--safe-top)) 1rem calc(2.5rem + var(--safe-bottom));
 }
 
+.app-switch {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  padding: 0.3rem;
+  border-radius: 999px;
+  background: rgba(16, 14, 12, 0.75);
+  border: 1px solid var(--line);
+}
+
+.app-switch-link {
+  flex: 1;
+  text-align: center;
+  text-decoration: none;
+  color: var(--text-muted);
+  padding: 0.65rem 0.7rem;
+  min-height: 44px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-switch-link.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.app-switch-link:hover:not(.active) {
+  color: var(--text);
+}
+
 .brand-bar {
   margin-bottom: 1.25rem;
   animation: rise 0.5s ease both;
